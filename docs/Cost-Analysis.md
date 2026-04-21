@@ -71,6 +71,41 @@ IOPS 是绝对主导成本，存储和吞吐占比相对较小。
 
 > 结论：**IOPS 是成本杠杆**。在 AVD 用户盘场景下，若单用户对 IOPS 需求不高（典型桌面办公），可大幅削减 IOPS 预配以节省开支。
 
+### 5.1 独享 Session Host 单用户场景（推荐）
+
+**场景**：每台 Session Host 只分配 1 个用户（独享），H: 盘主要用于个人文档、配置缓存等；客户核心需求是**吞吐 100 MiB/s**（例如偶发大文件读写），对 IOPS 没有明确要求。
+
+AVD 个人盘的稳态 IOPS 通常只有数十，峰值（Office 启动、打开大文档）也很少持续超过 500。**3000 IOPS 对单用户是严重过配**。HDD Provisioned v2 允许的 **IOPS 最小值 = 500**。
+
+| 方案 | IOPS | 带宽 MiB/s | 单 Share ¥/月 | 140 Share ¥/月 | 140 Share ¥/年 | vs 基线 |
+|---|---:|---:|---:|---:|---:|---:|
+| 基线（方案 A） | 3,000 | 100 | 1,474.01 | 206,361 | 2,476,336 | — |
+| **E. 推荐（1000 IOPS）** | **1,000** | **100** | **643.70** | **90,118** | **1,081,420** | **−56%** |
+| **F. 极致省（500 IOPS，最小值）** | **500** | **100** | **436.13** | **61,058** | **732,697** | **−70%** |
+
+公式：`存储 2194×0.000102×744 + IOPS N×0.000558×744 + 带宽 100×0.000834×744`
+
+**保留 100 MiB/s 带宽**即可满足客户核心需求；IOPS 降到 1000 甚至 500 基本不影响单用户交互体验，因为：
+1. Provisioned v2 支持 IOPS 积分突发（Credit-based），空闲时累积积分，峰值时可短时超出基线。
+2. 本次 DiskSpd 4K 测试能跑到 7500+ IOPS，那是 **QD=32** 的人造压测；单用户交互几乎不可能触发这个并发。
+3. IOPS 支持**在线热调**：先上 1000，观察 Azure Monitor 指标 `Transactions`（即已用 IOPS），不够随时上调。
+
+**调整命令**：
+```bash
+az storage share-rm update \
+  --storage-account <sa> --name <share> \
+  --provisioned-iops 1000 --provisioned-bandwidth 100 \
+  -g <rg>
+```
+
+**监控建议（上线后 1–2 周）**：
+```bash
+az monitor metrics list \
+  --resource /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<sa>/fileServices/default/fileShares/<share> \
+  --metric Transactions --aggregation Maximum Average --interval PT1H
+```
+若最大 IOPS < 300 → 可降到最小 500；若常顶到 800+ → 该 Share 单独调回 1500。
+
 ## 六、与 SSD (Premium) 价格对比
 
 若改用 SSD Provisioned v2（¥ 0.001392 / GiB / 小时，IOPS 含 3000 免费，带宽含 3000 IOPS 对应免费额度）：
