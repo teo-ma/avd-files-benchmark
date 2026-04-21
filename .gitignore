@@ -1,0 +1,9 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Local artifacts
+*.log
+*.tmp
+bench-output-*.json
+/tmp/
