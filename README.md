@@ -108,8 +108,13 @@ Id           Label                        MiBps  IOPS    AvgLat_ms P95Read_ms P9
 1G-RW-4K     1GB / RandWrite / 4K  (IOPS) 25.81  6606.66 4.842     N/A        8.091      
 ```
 
-完整报告：[docs/Benchmark-Report.md](docs/Benchmark-Report.md)
-原始 JSON：[results/avd-gpu-u6-2026-04-21.json](results/avd-gpu-u6-2026-04-21.json)
+完整报告：
+- [docs/Benchmark-Report.md](docs/Benchmark-Report.md) — 基线 3000 IOPS / 100 MiB/s 实测
+- [docs/Benchmark-Report-500IOPS.md](docs/Benchmark-Report-500IOPS.md) — **优化方案 500 IOPS / 100 MiB/s 实测**（客户核心需求 100 MiB/s 吞吐**完全不受影响**，月成本降 70%）
+
+原始 JSON：
+- [results/avd-gpu-u6-2026-04-21.json](results/avd-gpu-u6-2026-04-21.json)（3000 IOPS）
+- [results/avd-gpu-u6-2026-04-22-500iops.json](results/avd-gpu-u6-2026-04-22-500iops.json)（500 IOPS）
 
 ## 本次样本的共享配置
 
@@ -124,10 +129,16 @@ Id           Label                        MiBps  IOPS    AvgLat_ms P95Read_ms P9
 
 ## 成本
 
-**140 Share × 300 TB（每 Share ≈ 2.14 TiB，3000 IOPS，100 MiB/s，HDD Provisioned v2 LRS）**
-→ 约 **¥ 206,361 / 月**，**¥ 2,476,336 / 年**。
+**场景**：140 Share × 300 TB（每 Share ≈ 2.14 TiB，100 MiB/s 吞吐），HDD Provisioned v2 LRS。
 
-IOPS 是绝对主导成本（~84%）。详细拆分、敏感性分析、SSD/v1 对比：[docs/Cost-Analysis.md](docs/Cost-Analysis.md)
+| 方案 | IOPS | 月成本 | 年成本 | 说明 |
+|---|---:|---:|---:|---|
+| 基线 | 3000 | ¥206,361 | ¥2,476,336 | 最初配置 |
+| **推荐（已实测）** | **500** | **¥61,058** | **¥732,697** | **−70%**；独享 Session Host 场景客户体验无感 |
+
+**客户核心需求（100 MiB/s 吞吐）在 500 IOPS 下完全满足**（实测 131–161 MiB/s），详见 [Benchmark-Report-500IOPS.md](docs/Benchmark-Report-500IOPS.md)。
+
+详细拆分、敏感性分析、SSD/v1 对比：[docs/Cost-Analysis.md](docs/Cost-Analysis.md)
 
 ## 目录结构
 

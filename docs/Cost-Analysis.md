@@ -71,30 +71,45 @@ IOPS 是绝对主导成本，存储和吞吐占比相对较小。
 
 > 结论：**IOPS 是成本杠杆**。在 AVD 用户盘场景下，若单用户对 IOPS 需求不高（典型桌面办公），可大幅削减 IOPS 预配以节省开支。
 
-### 5.1 独享 Session Host 单用户场景（推荐）
+### 5.1 独享 Session Host 单用户场景（推荐，**已实测验证**）
 
 **场景**：每台 Session Host 只分配 1 个用户（独享），H: 盘主要用于个人文档、配置缓存等；客户核心需求是**吞吐 100 MiB/s**（例如偶发大文件读写），对 IOPS 没有明确要求。
 
 AVD 个人盘的稳态 IOPS 通常只有数十，峰值（Office 启动、打开大文档）也很少持续超过 500。**3000 IOPS 对单用户是严重过配**。HDD Provisioned v2 允许的 **IOPS 最小值 = 500**。
 
+#### ✅ 实测验证（2026-04-22 在 avd-gpu-u6 执行）
+
+将 `share1tb` 从 3000 IOPS 降至 **500 IOPS**（保持 100 MiB/s），重跑完整基准：
+
+| 指标（1GB 文件，64K 块） | 3000 IOPS | **500 IOPS** | 变化 |
+|---|---:|---:|---:|
+| 随机读吞吐 | 141.94 MiB/s | **131.98 MiB/s** | −7% |
+| 随机写吞吐 | 120.03 MiB/s | **148.78 MiB/s** | +24% |
+| 混合吞吐（70R30W） | 167.44 MiB/s | **161.33 MiB/s** | −4% |
+| 4K IOPS（读） | 7,568 | 5,081 | −33%（仍是单用户真实需求的数百倍） |
+
+**结论**：**客户 100 MiB/s 吞吐需求完全不受影响**，4K IOPS 从突发 9000 降到 5000 对单用户交互无感知。详见 [Benchmark-Report-500IOPS.md](Benchmark-Report-500IOPS.md)。
+
+#### 成本档位
+
 | 方案 | IOPS | 带宽 MiB/s | 单 Share ¥/月 | 140 Share ¥/月 | 140 Share ¥/年 | vs 基线 |
 |---|---:|---:|---:|---:|---:|---:|
 | 基线（方案 A） | 3,000 | 100 | 1,474.01 | 206,361 | 2,476,336 | — |
-| **E. 推荐（1000 IOPS）** | **1,000** | **100** | **643.70** | **90,118** | **1,081,420** | **−56%** |
-| **F. 极致省（500 IOPS，最小值）** | **500** | **100** | **436.13** | **61,058** | **732,697** | **−70%** |
+| E. 中档（1000 IOPS） | 1,000 | 100 | 643.70 | 90,118 | 1,081,420 | −56% |
+| **F. 推荐（500 IOPS，已实测）** | **500** | **100** | **436.13** | **61,058** | **732,697** | **−70%** |
 
 公式：`存储 2194×0.000102×744 + IOPS N×0.000558×744 + 带宽 100×0.000834×744`
 
-**保留 100 MiB/s 带宽**即可满足客户核心需求；IOPS 降到 1000 甚至 500 基本不影响单用户交互体验，因为：
+**保留 100 MiB/s 带宽**即可满足客户核心需求；IOPS 降到 500 基本不影响单用户交互体验，因为：
 1. Provisioned v2 支持 IOPS 积分突发（Credit-based），空闲时累积积分，峰值时可短时超出基线。
-2. 本次 DiskSpd 4K 测试能跑到 7500+ IOPS，那是 **QD=32** 的人造压测；单用户交互几乎不可能触发这个并发。
-3. IOPS 支持**在线热调**：先上 1000，观察 Azure Monitor 指标 `Transactions`（即已用 IOPS），不够随时上调。
+2. 本次 DiskSpd 4K 测试 500 IOPS 档位仍能跑到 5000+ IOPS，是 **QD=32** 的人造压测；单用户交互几乎不可能触发这个并发。
+3. IOPS 支持**在线热调**：先上 500，观察 Azure Monitor 指标 `Transactions`（即已用 IOPS），不够随时上调。
 
 **调整命令**：
 ```bash
 az storage share-rm update \
   --storage-account <sa> --name <share> \
-  --provisioned-iops 1000 --provisioned-bandwidth 100 \
+  --provisioned-iops 500 --provisioned-bandwidth 100 \
   -g <rg>
 ```
 
@@ -104,7 +119,7 @@ az monitor metrics list \
   --resource /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<sa>/fileServices/default/fileShares/<share> \
   --metric Transactions --aggregation Maximum Average --interval PT1H
 ```
-若最大 IOPS < 300 → 可降到最小 500；若常顶到 800+ → 该 Share 单独调回 1500。
+若最大 IOPS 常顶到 400+ → 该 Share 单独调回 1000；若一直在 200 以下 → 可保持 500 最小档。
 
 ## 六、与 SSD (Premium) 价格对比
 

@@ -43,6 +43,8 @@ injected = (
     f"$ShareName = '{share}'\n"
     f"$AccountKey = @'\n{key}\n'@\n"
     "$AccountKey = $AccountKey.Trim()\n"
+    "$DriveLetter = 'T:'\n"
+    "$ResultFile = ''\n"
 )
 open(out_path, 'w').write(src[:m.start()] + injected + src[m.end():])
 PY
