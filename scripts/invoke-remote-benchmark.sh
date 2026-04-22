@@ -32,9 +32,10 @@ SRC="$HERE/Run-Benchmark.ps1"
 BAKED="/tmp/Run-Benchmark-baked-$$.ps1"
 
 # 将 Key 烘入 here-string，避开 az run-command --parameters 在特殊字符 (+,=,/) 上的解析问题
-python3 - "$SRC" "$SA" "$SHARE" "$KEY" "$BAKED" <<'PY'
+PROFILE="${PROFILE:-Full}"
+python3 - "$SRC" "$SA" "$SHARE" "$KEY" "$BAKED" "$PROFILE" <<'PY'
 import re, sys
-src_path, sa, share, key, out_path = sys.argv[1:]
+src_path, sa, share, key, out_path, profile = sys.argv[1:]
 src = open(src_path).read()
 m = re.search(r'param\(\s*\n.*?\)\s*\n', src, re.DOTALL)
 assert m, 'no param block found in Run-Benchmark.ps1'
@@ -45,6 +46,7 @@ injected = (
     "$AccountKey = $AccountKey.Trim()\n"
     "$DriveLetter = 'T:'\n"
     "$ResultFile = ''\n"
+    f"$TestProfile = '{profile}'\n"
 )
 open(out_path, 'w').write(src[:m.start()] + injected + src[m.end():])
 PY

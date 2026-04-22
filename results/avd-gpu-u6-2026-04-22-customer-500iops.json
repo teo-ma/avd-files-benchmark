@@ -1,0 +1,9 @@
+[
+  {"Id":"1G-RR-64K","Label":"1GB   / RandRead   / 64K","Size":1073741824,"Block":65536,"WritePct":0,"Pattern":"Rand","Threads":4,"QD":8,"Bytes":"4539744256","IOs":"69271","MiBps":"144.31","IOPS":"2309.01","AvgLat_ms":"13.704","P95Read_ms":"31.240","P95Write_ms":"N/A"},
+  {"Id":"1G-RR-4K","Label":"1GB   / RandRead   / 4K   (IOPS)","Size":1073741824,"Block":4096,"WritePct":0,"Pattern":"Rand","Threads":4,"QD":8,"Bytes":"497192960","IOs":"121385","MiBps":"15.81","IOPS":"4046.16","AvgLat_ms":"7.914","P95Read_ms":"43.304","P95Write_ms":"N/A"},
+  {"Id":"1G-SR-1M","Label":"1GB   / SeqRead    / 1M   (BigFileCopy)","Size":1073741824,"Block":1048576,"WritePct":0,"Pattern":"SeqI","Threads":2,"QD":4,"Bytes":"5356126208","IOs":"5108","MiBps":"170.27","IOPS":"170.27","AvgLat_ms":"46.786","P95Read_ms":"117.143","P95Write_ms":"N/A"},
+  {"Id":"1G-SW-1M","Label":"1GB   / SeqWrite   / 1M   (BigFileCopy)","Size":1073741824,"Block":1048576,"WritePct":100,"Pattern":"SeqI","Threads":2,"QD":4,"Bytes":"2901409792","IOs":"2767","MiBps":"92.23","IOPS":"92.23","AvgLat_ms":"86.734","P95Read_ms":"N/A","P95Write_ms":"282.998"},
+  {"Id":"1G-SR-64K","Label":"1GB   / SeqRead    / 64K  (CAD-Load)","Size":1073741824,"Block":65536,"WritePct":0,"Pattern":"SeqI","Threads":2,"QD":4,"Bytes":"3453747200","IOs":"52700","MiBps":"109.79","IOPS":"1756.61","AvgLat_ms":"4.520","P95Read_ms":"6.188","P95Write_ms":"N/A"},
+  {"Id":"1G-MIX-64K-LQ","Label":"1GB   / 70R30W     / 64K  (Office-Edit)","Size":1073741824,"Block":65536,"WritePct":30,"Pattern":"Rand","Threads":2,"QD":2,"Bytes":"1765474304","IOs":"26939","MiBps":"56.12","IOPS":"897.97","AvgLat_ms":"4.460","P95Read_ms":"5.864","P95Write_ms":"10.781"},
+  {"Id":"100M-SW-64K","Label":"100MB / SeqWrite   / 64K  (Office-Save)","Size":104857600,"Block":65536,"WritePct":100,"Pattern":"SeqI","Threads":2,"QD":2,"Bytes":"385941504","IOs":"5889","MiBps":"12.27","IOPS":"196.30","AvgLat_ms":"20.375","P95Read_ms":"N/A","P95Write_ms":"33.141"}
+]

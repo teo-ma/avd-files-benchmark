@@ -36,7 +36,11 @@ param(
   [Parameter(Mandatory=$true)][string]$ShareName,
   [Parameter(Mandatory=$true)][string]$AccountKey,
   [string]$DriveLetter = 'T:',
-  [string]$ResultFile  = ''
+  [string]$ResultFile  = '',
+  # Full   : 11 项高压测试（原有矩阵）
+  # Customer : 7 项客户真实场景验收（CAD / 大文件拷贝 / Office）
+  # Quick  : 3 项快速巡检
+  [ValidateSet('Full','Customer','Quick')][string]$TestProfile = 'Full'
 )
 $ErrorActionPreference = 'Stop'
 
@@ -107,24 +111,45 @@ New-SmbGlobalMapping -LocalPath $DriveLetter -RemotePath $remote -Credential $cr
 New-Item -ItemType Directory -Path $testDir -Force | Out-Null
 
 # 3) Workload matrix
-$tests = @(
-  @{ Id='10M-RR-64K';  File='f10M.dat';  Size=10485760;    Block=65536; Write=0;   Label='10MB / RandRead  / 64K' }
-  @{ Id='10M-RW-64K';  File='f10M.dat';  Size=10485760;    Block=65536; Write=100; Label='10MB / RandWrite / 64K' }
-  @{ Id='10M-MIX-64K'; File='f10M.dat';  Size=10485760;    Block=65536; Write=30;  Label='10MB / 70R30W   / 64K' }
-  @{ Id='100M-RR-64K'; File='f100M.dat'; Size=104857600;   Block=65536; Write=0;   Label='100MB / RandRead  / 64K' }
-  @{ Id='100M-RW-64K'; File='f100M.dat'; Size=104857600;   Block=65536; Write=100; Label='100MB / RandWrite / 64K' }
-  @{ Id='100M-MIX-64K';File='f100M.dat'; Size=104857600;   Block=65536; Write=30;  Label='100MB / 70R30W   / 64K' }
-  @{ Id='1G-RR-64K';   File='f1G.dat';   Size=1073741824;  Block=65536; Write=0;   Label='1GB / RandRead  / 64K' }
-  @{ Id='1G-RW-64K';   File='f1G.dat';   Size=1073741824;  Block=65536; Write=100; Label='1GB / RandWrite / 64K' }
-  @{ Id='1G-MIX-64K';  File='f1G.dat';   Size=1073741824;  Block=65536; Write=30;  Label='1GB / 70R30W   / 64K' }
-  @{ Id='1G-RR-4K';    File='f1G.dat';   Size=1073741824;  Block=4096;  Write=0;   Label='1GB / RandRead  / 4K  (IOPS)' }
-  @{ Id='1G-RW-4K';    File='f1G.dat';   Size=1073741824;  Block=4096;  Write=100; Label='1GB / RandWrite / 4K  (IOPS)' }
+# Pattern: Rand (随机) / Seq (顺序) / SeqI (交错顺序多线程)
+$allTests = @(
+  # ---- Full profile：原 11 项压测，QD=32（t4 o8）、全随机 ----
+  @{ Id='10M-RR-64K';   File='f10M.dat';  Size=10485760;   Block=65536;  Write=0;   Pattern='Rand'; Threads=4; QD=8; Label='10MB  / RandRead   / 64K'; Profiles=@('Full') }
+  @{ Id='10M-RW-64K';   File='f10M.dat';  Size=10485760;   Block=65536;  Write=100; Pattern='Rand'; Threads=4; QD=8; Label='10MB  / RandWrite  / 64K'; Profiles=@('Full') }
+  @{ Id='10M-MIX-64K';  File='f10M.dat';  Size=10485760;   Block=65536;  Write=30;  Pattern='Rand'; Threads=4; QD=8; Label='10MB  / 70R30W     / 64K'; Profiles=@('Full') }
+  @{ Id='100M-RR-64K';  File='f100M.dat'; Size=104857600;  Block=65536;  Write=0;   Pattern='Rand'; Threads=4; QD=8; Label='100MB / RandRead   / 64K'; Profiles=@('Full') }
+  @{ Id='100M-RW-64K';  File='f100M.dat'; Size=104857600;  Block=65536;  Write=100; Pattern='Rand'; Threads=4; QD=8; Label='100MB / RandWrite  / 64K'; Profiles=@('Full') }
+  @{ Id='100M-MIX-64K'; File='f100M.dat'; Size=104857600;  Block=65536;  Write=30;  Pattern='Rand'; Threads=4; QD=8; Label='100MB / 70R30W     / 64K'; Profiles=@('Full') }
+  @{ Id='1G-RR-64K';    File='f1G.dat';   Size=1073741824; Block=65536;  Write=0;   Pattern='Rand'; Threads=4; QD=8; Label='1GB   / RandRead   / 64K'; Profiles=@('Full','Customer') }
+  @{ Id='1G-RW-64K';    File='f1G.dat';   Size=1073741824; Block=65536;  Write=100; Pattern='Rand'; Threads=4; QD=8; Label='1GB   / RandWrite  / 64K'; Profiles=@('Full') }
+  @{ Id='1G-MIX-64K';   File='f1G.dat';   Size=1073741824; Block=65536;  Write=30;  Pattern='Rand'; Threads=4; QD=8; Label='1GB   / 70R30W     / 64K'; Profiles=@('Full') }
+  @{ Id='1G-RR-4K';     File='f1G.dat';   Size=1073741824; Block=4096;   Write=0;   Pattern='Rand'; Threads=4; QD=8; Label='1GB   / RandRead   / 4K   (IOPS)'; Profiles=@('Full','Customer','Quick') }
+  @{ Id='1G-RW-4K';     File='f1G.dat';   Size=1073741824; Block=4096;   Write=100; Pattern='Rand'; Threads=4; QD=8; Label='1GB   / RandWrite  / 4K   (IOPS)'; Profiles=@('Full') }
+
+  # ---- Customer profile: real-world scenarios, low QD, seq-heavy ----
+  # Big file copy (AzCopy / Explorer)
+  @{ Id='1G-SR-1M';     File='f1G.dat';   Size=1073741824; Block=1048576; Write=0;  Pattern='SeqI'; Threads=2; QD=4; Label='1GB   / SeqRead    / 1M   (BigFileCopy)';  Profiles=@('Customer','Quick') }
+  @{ Id='1G-SW-1M';     File='f1Gw.dat';  Size=1073741824; Block=1048576; Write=100;Pattern='SeqI'; Threads=2; QD=4; Label='1GB   / SeqWrite   / 1M   (BigFileCopy)';  Profiles=@('Customer') }
+  # CAD / Rhino / NX load
+  @{ Id='1G-SR-64K';    File='f1G.dat';   Size=1073741824; Block=65536;   Write=0;  Pattern='SeqI'; Threads=2; QD=4; Label='1GB   / SeqRead    / 64K  (CAD-Load)';     Profiles=@('Customer','Quick') }
+  # Office editing
+  @{ Id='1G-MIX-64K-LQ';File='f1G.dat';   Size=1073741824; Block=65536;   Write=30; Pattern='Rand'; Threads=2; QD=2; Label='1GB   / 70R30W     / 64K  (Office-Edit)';  Profiles=@('Customer') }
+  # Office save small doc
+  @{ Id='100M-SW-64K';  File='f100Mw.dat';Size=104857600;  Block=65536;   Write=100;Pattern='SeqI'; Threads=2; QD=2; Label='100MB / SeqWrite   / 64K  (Office-Save)';   Profiles=@('Customer') }
 )
+
+$tests = $allTests | Where-Object { $_.Profiles -contains $TestProfile }
+Write-Host "[Profile=$TestProfile] Selected $($tests.Count) tests"
 
 $results = @()
 foreach ($t in $tests) {
     $path = Join-Path $testDir $t.File
-    $dsArgs = @("-c$($t.Size)", "-b$($t.Block)", '-d30', '-W5', '-t4', '-o8', '-r', "-w$($t.Write)", '-L', '-Sh', $path)
+    $dsArgs = @("-c$($t.Size)", "-b$($t.Block)", '-d30', '-W5', "-t$($t.Threads)", "-o$($t.QD)", "-w$($t.Write)", '-L', '-Sh', $path)
+    switch ($t.Pattern) {
+        'Rand' { $dsArgs = @('-r') + $dsArgs }
+        'SeqI' { $dsArgs = @('-si') + $dsArgs }
+        'Seq'  { }  # 默认每线程独立顺序流
+    }
     Write-Host "[$(Get-Date -Format HH:mm:ss)] Running $($t.Id): diskspd $($dsArgs -join ' ')"
     $out = & $exe @dsArgs 2>&1 | Out-String
 
@@ -145,6 +170,7 @@ foreach ($t in $tests) {
     }
     $results += [pscustomobject]@{
         Id=$t.Id; Label=$t.Label; Size=$t.Size; Block=$t.Block; WritePct=$t.Write
+        Pattern=$t.Pattern; Threads=$t.Threads; QD=$t.QD
         Bytes=$bytes; IOs=$ios; MiBps=$mibs; IOPS=$iops; AvgLat_ms=$avgLat
         P95Read_ms=$p95Read; P95Write_ms=$p95Write
     }

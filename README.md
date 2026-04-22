@@ -109,12 +109,27 @@ Id           Label                        MiBps  IOPS    AvgLat_ms P95Read_ms P9
 ```
 
 完整报告：
-- [docs/Benchmark-Report.md](docs/Benchmark-Report.md) — 基线 3000 IOPS / 100 MiB/s 实测
-- [docs/Benchmark-Report-500IOPS.md](docs/Benchmark-Report-500IOPS.md) — **优化方案 500 IOPS / 100 MiB/s 实测**（客户核心需求 100 MiB/s 吞吐**完全不受影响**，月成本降 70%）
+- [docs/Benchmark-Report.md](docs/Benchmark-Report.md) — 基线 3000 IOPS / 100 MiB/s 压测
+- [docs/Benchmark-Report-500IOPS.md](docs/Benchmark-Report-500IOPS.md) — 优化方案 500 IOPS / 100 MiB/s 压测
+- [docs/Benchmark-Report-Customer-Scenarios.md](docs/Benchmark-Report-Customer-Scenarios.md) — **客户真实场景验收（CAD 加载 / 大文件拷贝 / Office）** ⭐
 
 原始 JSON：
-- [results/avd-gpu-u6-2026-04-21.json](results/avd-gpu-u6-2026-04-21.json)（3000 IOPS）
-- [results/avd-gpu-u6-2026-04-22-500iops.json](results/avd-gpu-u6-2026-04-22-500iops.json)（500 IOPS）
+- [results/avd-gpu-u6-2026-04-21.json](results/avd-gpu-u6-2026-04-21.json)（3000 IOPS 压测）
+- [results/avd-gpu-u6-2026-04-22-500iops.json](results/avd-gpu-u6-2026-04-22-500iops.json)（500 IOPS 压测）
+- [results/avd-gpu-u6-2026-04-22-customer-500iops.json](results/avd-gpu-u6-2026-04-22-customer-500iops.json)（500 IOPS 客户场景）
+
+## 三种测试 Profile
+
+```powershell
+# Customer（推荐给客户）：7 项真实场景验收（CAD / 大文件 / Office）
+.\scripts\Run-Benchmark.ps1 -StorageAccount <sa> -ShareName <share> -AccountKey '<key>' -TestProfile Customer
+
+# Quick：3 项快速巡检（2 分钟）
+.\scripts\Run-Benchmark.ps1 ... -TestProfile Quick
+
+# Full：11 项高压力压测（默认，工程师诊断用）
+.\scripts\Run-Benchmark.ps1 ... -TestProfile Full
+```
 
 ## 本次样本的共享配置
 
