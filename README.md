@@ -34,24 +34,50 @@ export KEY="$(az storage account keys list -g $AZ_RG -n $SA --query '[0].value' 
 
 ### 方法 B：在 Session Host（Windows PowerShell）直接运行
 
+#### B-0：脚本已预置在 `avd-gpu-u6`（最快）
+
+`avd-gpu-u6` 已经预置好测试工具，可直接跑：
+
+```powershell
+# 以管理员身份打开 PowerShell
+cd C:\Tools\benchmark
+Set-ExecutionPolicy -Scope Process Bypass -Force
+
+# 客户场景验收（推荐，7 项，~5 分钟）
+.\Run-Benchmark.ps1 `
+  -StorageAccount stavdhaieru6h01 -ShareName share1tb `
+  -AccountKey '<KEY>' -TestProfile Customer
+
+# 快速巡检（3 项，~2 分钟）
+.\Run-Benchmark.ps1 -StorageAccount stavdhaieru6h01 -ShareName share1tb -AccountKey '<KEY>' -TestProfile Quick
+
+# 完整压测（11 项，~8 分钟）
+.\Run-Benchmark.ps1 -StorageAccount stavdhaieru6h01 -ShareName share1tb -AccountKey '<KEY>' -TestProfile Full
+```
+
+获取 Storage Account Key：
+
+```bash
+# 从本地 macOS/Linux
+az storage account keys list -g rg-avd-haier-20260312 -n stavdhaieru6h01 --query "[0].value" -o tsv
+```
+或在 Azure Portal → 存储账户 `stavdhaieru6h01` → 访问密钥 中复制。
+
+VM 上已预置：
+- `C:\Tools\benchmark\Run-Benchmark.ps1`（本仓库脚本）
+- `C:\Tools\diskspd\diskspd.exe`（DiskSpd v2.2.0）
+
+#### B-1：其他 Session Host（首次部署）
+
 1. RDP 登入 Session Host（以管理员身份打开 PowerShell）
 2. 下载 `Run-Benchmark.ps1`
    ```powershell
-   # 直接从本 GitHub repo 下载
+   New-Item -ItemType Directory -Path C:\Tools\benchmark -Force | Out-Null
    Invoke-WebRequest `
      -Uri 'https://raw.githubusercontent.com/teo-ma/avd-files-benchmark/main/scripts/Run-Benchmark.ps1' `
-     -OutFile C:\Tools\Run-Benchmark.ps1 -UseBasicParsing
+     -OutFile C:\Tools\benchmark\Run-Benchmark.ps1 -UseBasicParsing
    ```
-3. 执行
-   ```powershell
-   $key = '<你的 storage account key>'
-   Set-ExecutionPolicy -Scope Process Bypass -Force
-   C:\Tools\Run-Benchmark.ps1 `
-     -StorageAccount stavdhaieru6h01 `
-     -ShareName share1tb `
-     -AccountKey $key `
-     -ResultFile 'C:\Tools\bench-result.json'
-   ```
+3. 执行（同 B-0）
 
 ### 方法 C：预置 DiskSpd 到 Azure Files（离线场景）
 
@@ -70,7 +96,27 @@ export KEY="$(az storage account keys list -g $AZ_RG -n $SA --query '[0].value' 
 2. 若不存在，先临时映射共享尝试 `\\share\tools\diskspd.exe`
 3. 若仍找不到，fallback 到 GitHub 下载
 
-## 测试矩阵
+## 测试矩阵（按 Profile 区分）
+
+脚本通过 `-TestProfile <Full|Customer|Quick>` 选择。默认 `Full`。
+
+### `Customer`（7 项，客户真实场景验收，推荐）
+
+模拟真实办公工作流，使用低 QD（2×2 ~ 2×4）、顺序为主。
+
+| ID | 场景 | 文件 | 块大小 | 模式 | 读写 |
+|---|---|---|---:|---|---|
+| 1G-SR-1M | 大文件拷贝（读） | 1 GB | 1 MiB | 顺序 | 100% R |
+| 1G-SW-1M | 大文件拷贝（写） | 1 GB | 1 MiB | 顺序 | 100% W |
+| 1G-SR-64K | CAD/Rhino/NX 加载 | 1 GB | 64 KiB | 顺序 | 100% R |
+| 1G-MIX-64K-LQ | Office 编辑 | 1 GB | 64 KiB | 随机 | 70/30 |
+| 100M-SW-64K | Office 保存小文档 | 100 MB | 64 KiB | 顺序 | 100% W |
+| 1G-RR-64K | 对比：64K 随机读 | 1 GB | 64 KiB | 随机 | 100% R |
+| 1G-RR-4K | 对比：IOPS 上限 | 1 GB | 4 KiB | 随机 | 100% R |
+
+### `Full`（11 项，工程师高压力诊断）
+
+统一参数 `-d30 -W5 -t4 -o8 -r -L -Sh`（QD=32，随机访问，直通）。
 
 | ID | 文件大小 | 块大小 | 读写比 | 说明 |
 |---|---|---|---|---|
@@ -86,7 +132,9 @@ export KEY="$(az storage account keys list -g $AZ_RG -n $SA --query '[0].value' 
 | 1G-RR-4K | 1 GB | 4 KiB | 100% 读 | IOPS 读参考 |
 | 1G-RW-4K | 1 GB | 4 KiB | 100% 写 | IOPS 写参考 |
 
-统一参数：`-d30 -W5 -t4 -o8 -r -L -Sh`（QD=32，随机访问，直通）。
+### `Quick`（3 项，~2 分钟快速巡检）
+
+`1G-SR-1M`（带宽）+ `1G-SR-64K`（顺序读体验）+ `1G-RR-4K`（IOPS 下限）。
 
 ## 输出
 
@@ -118,18 +166,20 @@ Id           Label                        MiBps  IOPS    AvgLat_ms P95Read_ms P9
 - [results/avd-gpu-u6-2026-04-22-500iops.json](results/avd-gpu-u6-2026-04-22-500iops.json)（500 IOPS 压测）
 - [results/avd-gpu-u6-2026-04-22-customer-500iops.json](results/avd-gpu-u6-2026-04-22-customer-500iops.json)（500 IOPS 客户场景）
 
-## 三种测试 Profile
+## 三种测试 Profile 快速命令
 
 ```powershell
-# Customer（推荐给客户）：7 项真实场景验收（CAD / 大文件 / Office）
-.\scripts\Run-Benchmark.ps1 -StorageAccount <sa> -ShareName <share> -AccountKey '<key>' -TestProfile Customer
+# Customer（推荐给客户）：7 项真实场景验收（CAD / 大文件 / Office），~5 分钟
+.\Run-Benchmark.ps1 -StorageAccount <sa> -ShareName <share> -AccountKey '<key>' -TestProfile Customer
 
-# Quick：3 项快速巡检（2 分钟）
-.\scripts\Run-Benchmark.ps1 ... -TestProfile Quick
+# Quick：3 项快速巡检，~2 分钟
+.\Run-Benchmark.ps1 ... -TestProfile Quick
 
-# Full：11 项高压力压测（默认，工程师诊断用）
-.\scripts\Run-Benchmark.ps1 ... -TestProfile Full
+# Full：11 项高压力压测（工程师诊断用），~8 分钟
+.\Run-Benchmark.ps1 ... -TestProfile Full
 ```
+
+详见上方"测试矩阵（按 Profile 区分）"。
 
 ## 本次样本的共享配置
 
