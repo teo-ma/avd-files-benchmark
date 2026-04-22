@@ -1,0 +1,4 @@
+[
+  {"Label":"1G-MIX-64K-LQ","IOPS":867.62,"MiBps":54.23,"AvgMs":4.605,"P95Ms":9.980,"P99Ms":18.671},
+  {"Label":"100M-SW-64K","IOPS":710.25,"MiBps":44.39,"AvgMs":5.630,"P95Ms":null,"P99Ms":null}
+]
